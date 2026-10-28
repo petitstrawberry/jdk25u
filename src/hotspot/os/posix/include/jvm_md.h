@@ -70,7 +70,21 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#ifndef SCARLET
 #include <signal.h>
+#else
+// Signal numbers are accepted by JVM_FindSignal; registration is unsupported.
+#define SIGILL 4
+#define SIGABRT 6
+#define SIGFPE 8
+#define SIGSEGV 11
+#define SIGBUS 7
+#define SIGTRAP 5
+#define SIGINT 2
+#define SIGTERM 15
+#define SIGQUIT 3
+#define SIGHUP 1
+#endif
 
 /* Signals */
 

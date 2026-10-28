@@ -38,7 +38,7 @@
 #endif
 
 /* Defines SO_REUSEPORT */
-#if !defined(SO_REUSEPORT)
+#if !defined(SO_REUSEPORT) && !defined(__scarlet__)
 #ifdef _WIN32
 #define SO_REUSEPORT 0
 #elif defined(__linux__)
@@ -107,36 +107,56 @@ class SocketOptionRegistry {
                 Net.UNSPEC), new OptionKey(SOL_SOCKET, SO_RCVBUF));
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_SO_REUSEADDR,
                 Net.UNSPEC), new OptionKey(SOL_SOCKET, SO_REUSEADDR));
+#ifdef SO_REUSEPORT
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_SO_REUSEPORT,
                 Net.UNSPEC), new OptionKey(SOL_SOCKET, SO_REUSEPORT));
+#endif
             // IPPROTO_TCP is 6
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_TCP_NODELAY,
                 Net.UNSPEC), new OptionKey(6, TCP_NODELAY));
 
             // IPPROTO_IP is 0
+#ifdef IP_TOS
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_TOS,
                 StandardProtocolFamily.INET), new OptionKey(0, IP_TOS));
+#endif
+#ifdef IP_MULTICAST_IF
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_IF,
                 StandardProtocolFamily.INET), new OptionKey(0, IP_MULTICAST_IF));
+#endif
+#ifdef IP_MULTICAST_TTL
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_TTL,
                 StandardProtocolFamily.INET), new OptionKey(0, IP_MULTICAST_TTL));
+#endif
+#ifdef IP_MULTICAST_LOOP
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_LOOP,
                 StandardProtocolFamily.INET), new OptionKey(0, IP_MULTICAST_LOOP));
+#endif
 
 #ifdef AF_INET6
             // IPPROTO_IPV6 is 41
+#ifdef IPV6_TCLASS
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_TOS,
                 StandardProtocolFamily.INET6), new OptionKey(41, IPV6_TCLASS));
+#endif
+#ifdef IPV6_MULTICAST_IF
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_IF,
                 StandardProtocolFamily.INET6), new OptionKey(41, IPV6_MULTICAST_IF));
+#endif
+#ifdef IPV6_MULTICAST_HOPS
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_TTL,
                 StandardProtocolFamily.INET6), new OptionKey(41, IPV6_MULTICAST_HOPS));
+#endif
+#ifdef IPV6_MULTICAST_LOOP
             map.put(new RegistryKey(StandardSocketOptions.PREFIX_IP_MULTICAST_LOOP,
                 StandardProtocolFamily.INET6), new OptionKey(41, IPV6_MULTICAST_LOOP));
 #endif
+#endif
 
+#ifdef SO_OOBINLINE
             map.put(new RegistryKey(ExtendedSocketOption.PREFIX_SO_OOBINLINE,
                 Net.UNSPEC), new OptionKey(SOL_SOCKET, SO_OOBINLINE));
+#endif
             return map;
         }
     }

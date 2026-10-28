@@ -58,6 +58,11 @@
 
 #include <limits.h>
 #include <errno.h>
+#ifdef SCARLET
+#include <strings.h>
+#include <sys/time.h>
+struct ucontext_t;
+#endif
 
 #if defined(LINUX) || defined(_ALLBSD_SOURCE) || defined(_AIX)
 #include <signal.h>
@@ -74,7 +79,7 @@
 // checking for nanness
 #if defined(__APPLE__)
 inline int g_isnan(double f) { return isnan(f); }
-#elif defined(LINUX) || defined(_ALLBSD_SOURCE) || defined(_AIX)
+#elif defined(LINUX) || defined(_ALLBSD_SOURCE) || defined(_AIX) || defined(SCARLET)
 inline int g_isnan(float  f) { return isnan(f); }
 inline int g_isnan(double f) { return isnan(f); }
 #else

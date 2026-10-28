@@ -81,6 +81,14 @@ AC_DEFUN_ONCE([LIB_DETERMINE_DEPENDENCIES],
     NEEDS_LIB_ALSA=false
   fi
 
+  # The initial Scarlet port builds java.base without desktop modules.
+  if test "x$OPENJDK_TARGET_OS" = xscarlet; then
+    NEEDS_LIB_X11=false
+    NEEDS_LIB_FONTCONFIG=false
+    NEEDS_LIB_CUPS=false
+    NEEDS_LIB_FREETYPE=false
+  fi
+
   # Check if ffi is needed
   if HOTSPOT_CHECK_JVM_VARIANT(zero) || test "x$ENABLE_FALLBACK_LINKER" = "xtrue"; then
     NEEDS_LIB_FFI=true

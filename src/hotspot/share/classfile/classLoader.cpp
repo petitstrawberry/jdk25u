@@ -268,7 +268,13 @@ ClassFileStream* ClassPathDirEntry::open_stream(JavaThread* current, const char*
     if (file_handle != -1) {
       // read contents into resource array
       u1* buffer = NEW_RESOURCE_ARRAY_IN_THREAD(current, u1, st.st_size);
-      size_t num_read = ::read(file_handle, (char*) buffer, st.st_size);
+      size_t num_read = 0;
+      while (num_read < (size_t)st.st_size) {
+        ssize_t n = ::read(file_handle, (char*)buffer + num_read, st.st_size - num_read);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        num_read += (size_t)n;
+      }
       // close file
       ::close(file_handle);
       // construct ClassFileStream

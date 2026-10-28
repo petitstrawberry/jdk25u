@@ -60,8 +60,11 @@ final class ProcessImpl extends Process {
     private static final JavaIOFileDescriptorAccess fdAccess
         = SharedSecrets.getJavaIOFileDescriptorAccess();
 
-    // Linux platforms support a normal (non-forcible) kill signal.
-    static final boolean SUPPORTS_NORMAL_TERMINATION = true;
+    // Scarlet does not provide fork/exec or posix_spawn.
+    private static final boolean PROCESS_CREATION_SUPPORTED = !OperatingSystem.isScarlet();
+
+    // Supported Unix platforms provide a normal (non-forcible) kill signal.
+    static final boolean SUPPORTS_NORMAL_TERMINATION = PROCESS_CREATION_SUPPORTED;
 
     // Cache for JNU Charset. The encoding name is guaranteed
     // to be supported in this environment.
@@ -128,8 +131,10 @@ final class ProcessImpl extends Process {
             "process launch mechanism on this platform: " + OperatingSystem.current());
     }
 
-    private static final LaunchMechanism launchMechanism = launchMechanism();
-    private static final byte[] helperpath = toCString(StaticProperty.javaHome() + "/lib/jspawnhelper");
+    private static final LaunchMechanism launchMechanism =
+        PROCESS_CREATION_SUPPORTED ? launchMechanism() : null;
+    private static final byte[] helperpath = PROCESS_CREATION_SUPPORTED
+        ? toCString(StaticProperty.javaHome() + "/lib/jspawnhelper") : null;
 
     private static byte[] toCString(String s) {
         if (s == null)
@@ -151,6 +156,10 @@ final class ProcessImpl extends Process {
                          boolean redirectErrorStream)
             throws IOException
     {
+        if (!PROCESS_CREATION_SUPPORTED) {
+            throw new UnsupportedOperationException(
+                "Process creation is not supported on Scarlet");
+        }
         assert cmdarray != null && cmdarray.length > 0;
 
         // Convert arguments to a contiguous block; it's easier to do
@@ -555,7 +564,9 @@ final class ProcessImpl extends Process {
     private static native void init();
 
     static {
-        init();
+        if (PROCESS_CREATION_SUPPORTED) {
+            init();
+        }
     }
 
     /**

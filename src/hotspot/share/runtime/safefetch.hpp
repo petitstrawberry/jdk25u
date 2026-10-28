@@ -34,7 +34,7 @@
 #if defined(_WIN32) && !defined(_M_ARM64)
   // Windows x86_64 uses Structured Exception Handling
   #include "safefetch_windows.hpp"
-#elif defined(ZERO) || defined (_AIX)
+#elif defined(ZERO) || defined (_AIX) || defined(SCARLET)
   // These platforms implement safefetch via Posix sigsetjmp/longjmp.
   // This is slower than the other methods and uses more thread stack,
   // but its safe and portable.

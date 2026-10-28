@@ -25,6 +25,7 @@
 
 package sun.nio.ch;
 
+import jdk.internal.util.OperatingSystem;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -331,8 +332,10 @@ class SocketChannelImpl
             set.add(StandardSocketOptions.SO_LINGER);
             set.add(StandardSocketOptions.TCP_NODELAY);
             // additional options required by socket adaptor
-            set.add(StandardSocketOptions.IP_TOS);
-            set.add(ExtendedSocketOption.SO_OOBINLINE);
+            if (!OperatingSystem.isScarlet()) {
+                set.add(StandardSocketOptions.IP_TOS);
+                set.add(ExtendedSocketOption.SO_OOBINLINE);
+            }
             set.addAll(ExtendedSocketOptions.clientSocketOptions());
             return Collections.unmodifiableSet(set);
         }

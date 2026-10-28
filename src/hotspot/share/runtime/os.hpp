@@ -1027,7 +1027,9 @@ class os: AllStatic {
   // TODO: This is for compatibility only with current usage of os::Linux, etc.
   // We can get rid of the following block if we rename such a class to something
   // like ::LinuxUtils
-#if defined(AIX)
+#if defined(SCARLET)
+  class Scarlet;
+#elif defined(AIX)
   class Aix;
 #elif defined(BSD)
   class Bsd;

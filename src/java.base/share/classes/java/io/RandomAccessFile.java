@@ -25,6 +25,7 @@
 
 package java.io;
 
+import jdk.internal.util.OperatingSystem;
 import java.nio.channels.FileChannel;
 
 import jdk.internal.access.JavaIORandomAccessFileAccess;
@@ -237,6 +238,10 @@ public class RandomAccessFile implements DataOutput, DataInput, Closeable {
         }
         this.rw = rw;
         this.sync = sync;
+        if (OperatingSystem.isScarlet() && sync) {
+            throw new UnsupportedOperationException(
+                "Synchronous random access files are not supported on Scarlet");
+        }
 
         if (openAndDelete)
             imode |= O_TEMPORARY;

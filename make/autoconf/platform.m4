@@ -186,6 +186,10 @@ AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_CPU],
 AC_DEFUN([PLATFORM_EXTRACT_VARS_FROM_OS],
 [
   case "$1" in
+    *scarlet*)
+      VAR_OS=scarlet
+      VAR_OS_TYPE=unix
+      ;;
     *linux*)
       VAR_OS=linux
       VAR_OS_TYPE=unix

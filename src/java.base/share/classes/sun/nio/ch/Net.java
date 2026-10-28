@@ -25,6 +25,7 @@
 
 package sun.nio.ch;
 
+import jdk.internal.util.OperatingSystem;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.net.Inet4Address;
@@ -388,8 +389,12 @@ public class Net {
 
         // map option name to platform level/name
         OptionKey key = SocketOptionRegistry.findOption(name, family);
-        if (key == null)
+        if (key == null) {
+            if (OperatingSystem.isScarlet()) {
+                throw new UnsupportedOperationException(name + " is not supported on Scarlet");
+            }
             throw new AssertionError("Option not found");
+        }
 
         int arg;
         if (type == Integer.class) {
@@ -442,8 +447,12 @@ public class Net {
 
         // map option name to platform level/name
         OptionKey key = SocketOptionRegistry.findOption(name, family);
-        if (key == null)
+        if (key == null) {
+            if (OperatingSystem.isScarlet()) {
+                throw new UnsupportedOperationException(name + " is not supported on Scarlet");
+            }
             throw new AssertionError("Option not found");
+        }
 
         boolean mayNeedConversion = (family == UNSPEC);
         int value = getIntOption0(fd, mayNeedConversion, key.level(), key.name());
@@ -797,7 +806,7 @@ public class Net {
         FAST_LOOPBACK = isFastTcpLoopbackRequested();
 
         IPV6_AVAILABLE = isIPv6Available0();
-        SO_REUSEPORT_AVAILABLE = isReusePortAvailable0();
+        SO_REUSEPORT_AVAILABLE = !OperatingSystem.isScarlet() && isReusePortAvailable0();
     }
 
     private static AssertionError shouldNotReachHere() {

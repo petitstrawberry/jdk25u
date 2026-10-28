@@ -54,6 +54,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.ref.CleanerFactory;
+import jdk.internal.util.OperatingSystem;
 import sun.net.ConnectionResetException;
 import sun.net.NetHooks;
 import sun.net.PlatformSocketImpl;
@@ -920,10 +921,14 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
             options.add(StandardSocketOptions.SO_REUSEADDR);
             if (server) {
                 // IP_TOS added for server socket to maintain compatibility
-                options.add(StandardSocketOptions.IP_TOS);
+                if (!OperatingSystem.isScarlet()) {
+                    options.add(StandardSocketOptions.IP_TOS);
+                }
                 options.addAll(ExtendedSocketOptions.serverSocketOptions());
             } else {
-                options.add(StandardSocketOptions.IP_TOS);
+                if (!OperatingSystem.isScarlet()) {
+                    options.add(StandardSocketOptions.IP_TOS);
+                }
                 options.add(StandardSocketOptions.SO_KEEPALIVE);
                 options.add(StandardSocketOptions.SO_SNDBUF);
                 options.add(StandardSocketOptions.SO_LINGER);

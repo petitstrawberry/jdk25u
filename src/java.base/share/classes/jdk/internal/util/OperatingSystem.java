@@ -59,6 +59,7 @@ import jdk.internal.vm.annotation.ForceInline;
  *          case AIX->32768;
  *          case MACOS->49152;
  *          case WINDOWS->49152;
+ *          case SCARLET->49152;
  *      };
  * }
  *}
@@ -81,6 +82,10 @@ public enum OperatingSystem {
      * The AIX Operating system.
      */
     AIX,
+    /**
+     * The Scarlet operating system.
+     */
+    SCARLET,
     ;
 
     // The current OperatingSystem
@@ -116,6 +121,14 @@ public enum OperatingSystem {
     @ForceInline
     public static boolean isAix() {
         return PlatformProps.TARGET_OS_IS_AIX;
+    }
+
+    /**
+     * {@return {@code true} if built for the Scarlet operating system}
+     */
+    @ForceInline
+    public static boolean isScarlet() {
+        return PlatformProps.TARGET_OS_IS_SCARLET;
     }
 
     /**

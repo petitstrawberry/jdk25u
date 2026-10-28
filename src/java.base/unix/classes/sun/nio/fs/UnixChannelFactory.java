@@ -32,6 +32,7 @@ import java.util.Set;
 
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.access.JavaIOFileDescriptorAccess;
+import jdk.internal.util.OperatingSystem;
 import sun.nio.ch.FileChannelImpl;
 import sun.nio.ch.ThreadPool;
 import sun.nio.ch.SimpleAsynchronousFileChannelImpl;
@@ -69,6 +70,13 @@ class UnixChannelFactory {
         static Flags toFlags(Set<? extends OpenOption> options) {
             Flags flags = new Flags();
             for (OpenOption option: options) {
+                // Reject unsupported modes before creating/truncating a file,
+                // including opens relative to a SecureDirectoryStream.
+                if ((option == StandardOpenOption.SYNC && O_SYNC == -1) ||
+                    (option == StandardOpenOption.DSYNC && O_DSYNC == -1) ||
+                    (OperatingSystem.isScarlet() && ExtendedOptions.DIRECT.matches(option))) {
+                    throw new UnsupportedOperationException(option + " not supported");
+                }
                 if (option instanceof StandardOpenOption) {
                     switch ((StandardOpenOption)option) {
                         case READ : flags.read = true; break;

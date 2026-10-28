@@ -89,7 +89,9 @@
 # include <poll.h>
 #endif
 
+#ifndef SCARLET
 # include <signal.h>
+#endif
 # include <errno.h>
 
 OSThread*         os::_starting_thread    = nullptr;
@@ -314,6 +316,13 @@ static void free_array_of_char_arrays(char** a, size_t n) {
 
 bool os::dll_locate_lib(char *buffer, size_t buflen,
                         const char* pname, const char* fname) {
+#ifdef SCARLET
+  // A static JNI library has no shared-object file to stat. Resolve its
+  // registered entry point from the executable instead.
+  if (!dll_build_name(buffer, buflen, fname)) return false;
+  char error[1];
+  return dll_load(buffer, error, sizeof(error)) != nullptr;
+#else
   bool retval = false;
 
   size_t fullfnamelen = strlen(JNI_LIB_PREFIX) + strlen(fname) + strlen(JNI_LIB_SUFFIX);
@@ -358,6 +367,7 @@ bool os::dll_locate_lib(char *buffer, size_t buflen,
 
   FREE_C_HEAP_ARRAY(char*, fullfname);
   return retval;
+#endif
 }
 
 // --------------------- sun.misc.Signal (optional) ---------------------
@@ -955,7 +965,7 @@ static void print_ascii_form(stringStream& ascii_form, uint64_t value, int units
   for (int i = 0; i < unitsize; i++) {
     const int idx = LITTLE_ENDIAN_ONLY(i) BIG_ENDIAN_ONLY(sizeof(u.v) - unitsize + i);
     const uint8_t c = u.c[idx];
-    ascii_form.put(isprint(c) && isascii(c) ? c : '.');
+    ascii_form.put(isprint(c) && c < 128 ? c : '.');
   }
 }
 
@@ -1204,6 +1214,15 @@ void os::print_date_and_time(outputStream *st, char* buf, size_t buflen) {
 
   time_t tloc;
   (void)time(&tloc);
+#ifdef SCARLET
+  struct tm tm_value;
+  if (localtime_pd(&tloc, &tm_value) != nullptr &&
+      jio_snprintf(buf, buflen, "%04d-%02d-%02d %02d:%02d:%02d UTC",
+          tm_value.tm_year + 1900, tm_value.tm_mon + 1, tm_value.tm_mday,
+          tm_value.tm_hour, tm_value.tm_min, tm_value.tm_sec) > 0) {
+    st->print("Time: %s", buf);
+  }
+#else
   char* timestring = ctime(&tloc);  // ctime adds newline.
   // edit out the newline
   char* nl = strchr(timestring, '\n');
@@ -1223,6 +1242,8 @@ void os::print_date_and_time(outputStream *st, char* buf, size_t buflen) {
   } else {
     st->print("Time: %s", timestring);
   }
+
+#endif
 
   double t = os::elapsedTime();
   st->print(" elapsed time: ");
@@ -1867,7 +1888,11 @@ const char* os::errno_name(int e) {
 int os::create_binary_file(const char* path, bool rewrite_existing) {
   int oflags = O_WRONLY | O_CREAT WINDOWS_ONLY(| O_BINARY);
   oflags |= rewrite_existing ? O_TRUNC : O_EXCL;
+#ifdef SCARLET
+  return ::open(path, oflags, S_IRUSR | S_IWUSR);
+#else
   return ::open(path, oflags, S_IREAD | S_IWRITE);
+#endif
 }
 
 void os::trace_page_sizes(const char* str,

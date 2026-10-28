@@ -97,7 +97,9 @@
 #include "utilities/align.hpp"
 #include "utilities/checkedCast.hpp"
 #include "utilities/debug.hpp"
+#ifndef SCARLET
 #include "utilities/elfFile.hpp"
+#endif
 #include "utilities/exceptions.hpp"
 #include "utilities/macros.hpp"
 #include "utilities/nativeCallStack.hpp"
@@ -2609,7 +2611,7 @@ WB_END
 
 // Elf decoder
 WB_ENTRY(void, WB_DisableElfSectionCache(JNIEnv* env))
-#if !defined(_WINDOWS) && !defined(__APPLE__) && !defined(_AIX)
+#if !defined(_WINDOWS) && !defined(__APPLE__) && !defined(_AIX) && !defined(SCARLET)
   ElfFile::_do_not_cache_elf_section = true;
 #endif
 WB_END

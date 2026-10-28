@@ -52,13 +52,20 @@ class UnixConstants {
     static final int PREFIX_O_CREAT = O_CREAT;
     static final int PREFIX_O_EXCL = O_EXCL;
     static final int PREFIX_O_TRUNC = O_TRUNC;
+#ifdef O_SYNC
     static final int PREFIX_O_SYNC = O_SYNC;
+#else
+    // Unsupported sentinel, rejected by UnixChannelFactory before open.
+    static final int PREFIX_O_SYNC = -1;
+#endif
 
-#ifndef O_DSYNC
-    // At least FreeBSD doesn't define O_DSYNC
+#ifdef O_DSYNC
+    static final int PREFIX_O_DSYNC = O_DSYNC;
+#elif defined(O_SYNC)
+    // A full sync is sufficient when only O_SYNC is available.
     static final int PREFIX_O_DSYNC = O_SYNC;
 #else
-    static final int PREFIX_O_DSYNC = O_DSYNC;
+    static final int PREFIX_O_DSYNC = -1;
 #endif
 
 #ifdef O_NOFOLLOW
@@ -99,7 +106,12 @@ class UnixConstants {
     static final int PREFIX_X_OK = X_OK;
     static final int PREFIX_F_OK = F_OK;
     static final int PREFIX_ENOENT = ENOENT;
+#ifdef ENXIO
     static final int PREFIX_ENXIO = ENXIO;
+#else
+    // No matching native errno; do not manufacture an ABI value.
+    static final int PREFIX_ENXIO = -1;
+#endif
     static final int PREFIX_EACCES = EACCES;
     static final int PREFIX_EEXIST = EEXIST;
     static final int PREFIX_ENOTDIR = ENOTDIR;
@@ -114,11 +126,13 @@ class UnixConstants {
     static final int PREFIX_ELOOP = ELOOP;
     static final int PREFIX_EROFS = EROFS;
 
-#ifndef ENODATA
-    // Only used in Linux java source, provide any value so it compiles
+#ifdef ENODATA
+    static final int PREFIX_ENODATA = ENODATA;
+#elif defined(ELAST)
     static final int PREFIX_ENODATA = ELAST;
 #else
-    static final int PREFIX_ENODATA = ENODATA;
+    // Extended attributes are unavailable on Scarlet.
+    static final int PREFIX_ENODATA = -1;
 #endif
 
 // fgetxattr error codes for absent attributes depend on the OS:

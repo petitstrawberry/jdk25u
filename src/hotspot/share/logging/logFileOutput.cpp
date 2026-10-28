@@ -67,7 +67,13 @@ void LogFileOutput::set_file_name_parameters(jlong vm_start_time) {
   struct tm local_time;
   time_t utc_time = vm_start_time / 1000;
   os::localtime_pd(&utc_time, &local_time);
+#ifdef SCARLET
+  res = jio_snprintf(_vm_start_time_str, sizeof(_vm_start_time_str), "%04d-%02d-%02d_%02d-%02d-%02d",
+      local_time.tm_year + 1900, local_time.tm_mon + 1, local_time.tm_mday,
+      local_time.tm_hour, local_time.tm_min, local_time.tm_sec);
+#else
   res = (int)strftime(_vm_start_time_str, sizeof(_vm_start_time_str), TimestampFormat, &local_time);
+#endif
   assert(res > 0, "VM start time buffer too small.");
 }
 
