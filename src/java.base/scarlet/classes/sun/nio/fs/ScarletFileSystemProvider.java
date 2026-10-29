@@ -35,6 +35,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -49,6 +50,19 @@ class ScarletFileSystemProvider extends UnixFileSystemProvider {
     @Override
     ScarletFileSystem newFileSystem(String dir) {
         return new ScarletFileSystem(this, dir);
+    }
+
+    @Override
+    public void createDirectory(Path path, FileAttribute<?>... attrs) throws IOException {
+        // Native Scarlet currently creates directories with mode 0755 and has
+        // no process umask. Select the platform default before entering the
+        // shared Unix implementation; explicit attributes retain their checks.
+        if (attrs.length == 0) {
+            super.createDirectory(path, PosixFilePermissions.asFileAttribute(
+                    PosixFilePermissions.fromString("rwxr-xr-x")));
+        } else {
+            super.createDirectory(path, attrs);
+        }
     }
 
     private static void checkOpenOptions(Set<? extends OpenOption> options) {
