@@ -23,10 +23,13 @@
  * questions.
  */
 
-/* Scarlet's initial NIO backend exposes read-only file metadata and paths.
- * Channel IO, directory enumeration and mutation are separate porting work.
+/* Scarlet NIO exposes file metadata, paths and basic filesystem operations.
+ * File channels and optional descriptor-relative operations are separate porting work.
  * Do not advertise optional *at, xattr or birth-time capabilities.
  */
+#include <dirent.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -236,4 +239,241 @@ Java_sun_nio_fs_UnixNativeDispatcher_access0(JNIEnv* env, jclass this,
 JNIEXPORT jboolean JNICALL
 Java_sun_nio_fs_UnixNativeDispatcher_fchmodatNoFollowSupported0(JNIEnv* env, jclass this) {
     return JNI_FALSE;
+}
+
+JNIEXPORT jint
+Java_sun_nio_fs_UnixNativeDispatcher_dup(JNIEnv* env, jclass this, jint fd) {
+
+    int res = -1;
+
+    RESTARTABLE(dup((int)fd), res);
+    if (res == -1) {
+        throwUnixException(env, errno);
+    }
+    return (jint)res;
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_open0(JNIEnv* env, jclass this,
+    jlong pathAddress, jint oflags, jint mode)
+{
+    jint fd;
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    RESTARTABLE(open(path, (int)oflags, (mode_t)mode), fd);
+    if (fd == -1) {
+        throwUnixException(env, errno);
+    }
+    return fd;
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_close0(JNIEnv* env, jclass this, jint fd) {
+    int res;
+
+    res = close((int)fd);
+    if (res == -1 && errno != EINTR) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_mkdir0(JNIEnv* env, jclass this,
+    jlong pathAddress, jint mode)
+{
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    /* EINTR not listed as a possible error */
+    if (mkdir(path, (mode_t)mode) == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_rmdir0(JNIEnv* env, jclass this,
+    jlong pathAddress)
+{
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    /* EINTR not listed as a possible error */
+    if (rmdir(path) == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_unlink0(JNIEnv* env, jclass this,
+    jlong pathAddress)
+{
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    /* EINTR not listed as a possible error */
+    if (unlink(path) == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_rename0(JNIEnv* env, jclass this,
+    jlong fromAddress, jlong toAddress)
+{
+    const char* from = (const char*)jlong_to_ptr(fromAddress);
+    const char* to = (const char*)jlong_to_ptr(toAddress);
+
+    /* EINTR not listed as a possible error */
+    if (rename(from, to) == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_symlink0(JNIEnv* env, jclass this,
+    jlong targetAddress, jlong linkAddress)
+{
+    const char* target = (const char*)jlong_to_ptr(targetAddress);
+    const char* link = (const char*)jlong_to_ptr(linkAddress);
+
+    /* EINTR not listed as a possible error */
+    if (symlink(target, link) == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_readlink0(JNIEnv* env, jclass this,
+    jlong pathAddress)
+{
+    jbyteArray result = NULL;
+    char target[PATH_MAX+1];
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    /* EINTR not listed as a possible error */
+    int n = readlink(path, target, sizeof(target));
+    if (n == -1) {
+        throwUnixException(env, errno);
+    } else {
+        jsize len;
+        if (n == sizeof(target)) {
+            /* Traditionally readlink(2) should not return more than */
+            /* PATH_MAX bytes (no terminating null byte is appended). */
+            throwUnixException(env, ENAMETOOLONG);
+            return NULL;
+        }
+        target[n] = '\0';
+        len = (jsize)strlen(target);
+        result = (*env)->NewByteArray(env, len);
+        if (result != NULL) {
+            (*env)->SetByteArrayRegion(env, result, 0, len, (jbyte*)target);
+        }
+    }
+    return result;
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_chmod0(JNIEnv* env, jclass this,
+    jlong pathAddress, jint mode)
+{
+    int err;
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    RESTARTABLE(chmod(path, (mode_t)mode), err);
+    if (err == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_fchmod0(JNIEnv* env, jclass this, jint filedes,
+    jint mode)
+{
+    int err;
+
+    RESTARTABLE(fchmod((int)filedes, (mode_t)mode), err);
+    if (err == -1) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT jlong JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_opendir0(JNIEnv* env, jclass this,
+    jlong pathAddress)
+{
+    DIR* dir;
+    const char* path = (const char*)jlong_to_ptr(pathAddress);
+
+    /* EINTR not listed as a possible error */
+    dir = opendir(path);
+    if (dir == NULL) {
+        throwUnixException(env, errno);
+    }
+    return ptr_to_jlong(dir);
+}
+
+JNIEXPORT jlong JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_fdopendir(JNIEnv* env, jclass this, int dfd) {
+    DIR* dir;
+
+    /* EINTR not listed as a possible error */
+    dir = fdopendir((int)dfd);
+    if (dir == NULL) {
+        throwUnixException(env, errno);
+    }
+    return ptr_to_jlong(dir);
+}
+
+JNIEXPORT void JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_closedir(JNIEnv* env, jclass this, jlong dir) {
+    DIR* dirp = jlong_to_ptr(dir);
+
+    if (closedir(dirp) == -1 && errno != EINTR) {
+        throwUnixException(env, errno);
+    }
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_readdir0(JNIEnv* env, jclass this, jlong value) {
+    DIR* dirp = jlong_to_ptr(value);
+    struct dirent* ptr;
+
+    errno = 0;
+    ptr = readdir(dirp);
+    if (ptr == NULL) {
+        if (errno != 0) {
+            throwUnixException(env, errno);
+        }
+        return NULL;
+    } else {
+        jsize len = strlen(ptr->d_name);
+        jbyteArray bytes = (*env)->NewByteArray(env, len);
+        if (bytes != NULL) {
+            (*env)->SetByteArrayRegion(env, bytes, 0, len, (jbyte*)(ptr->d_name));
+        }
+        return bytes;
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_read0(JNIEnv* env, jclass this, jint fd,
+    jlong address, jint nbytes)
+{
+    ssize_t n;
+    void* bufp = jlong_to_ptr(address);
+    RESTARTABLE(read((int)fd, bufp, (size_t)nbytes), n);
+    if (n == -1) {
+        throwUnixException(env, errno);
+    }
+    return (jint)n;
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_fs_UnixNativeDispatcher_write0(JNIEnv* env, jclass this, jint fd,
+    jlong address, jint nbytes)
+{
+    ssize_t n;
+    void* bufp = jlong_to_ptr(address);
+    RESTARTABLE(write((int)fd, bufp, (size_t)nbytes), n);
+    if (n == -1) {
+        throwUnixException(env, errno);
+    }
+    return (jint)n;
 }
