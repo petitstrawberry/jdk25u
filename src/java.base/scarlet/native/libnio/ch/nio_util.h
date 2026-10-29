@@ -33,3 +33,6 @@ jint fdval(JNIEnv *env, jobject fdo);
 void setfdval(JNIEnv *env, jobject fdo, jint value);
 jint convertReturnVal(JNIEnv *env, jint n, jboolean reading);
 jlong convertLongReturnVal(JNIEnv *env, jlong n, jboolean reading);
+
+/* Raw bounded vector transfer; callers map errno for file/socket semantics. */
+jlong scarlet_vectorIO(JNIEnv *env, jobject fd, jlong address, jint count, jboolean reading);

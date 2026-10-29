@@ -29,6 +29,7 @@
 #include "io_util.h"
 #include "io_util_md.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -109,12 +110,19 @@ jint handleAvailable(FD fd, jlong *bytes) {
     off_t position;
     int result;
     RESTARTABLE(fstat(fd, &st), result);
-    if (result < 0) return 0;
+    if (result < 0) {
+        /* Native pipe handles have no FileObject metadata capability. Check
+         * that the descriptor is still open before returning the conservative
+         * zero estimate permitted by InputStream.available(). */
+        if (fcntl(fd, F_GETFD) < 0) return 0;
+        *bytes = 0;
+        return 1;
+    }
     if (!S_ISREG(st.st_mode)) {
-        /* The SDK does not implement FIONREAD. The Java entry point converts
-         * ENOTSUP to UnsupportedOperationException. */
-        errno = ENOTSUP;
-        return 0;
+        /* Native has no queued-byte query for streams. Zero is an estimate,
+         * not EOF: callers must still perform their normal blocking read. */
+        *bytes = 0;
+        return 1;
     }
     RESTARTABLE(lseek(fd, 0, SEEK_CUR), position);
     if (position < 0) return 0;

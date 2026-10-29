@@ -32,6 +32,7 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/file.h>
 
 #if defined(_ALLBSD_SOURCE)
 #define fdatasync fsync
@@ -59,7 +60,7 @@
 /* Keep each vector operation a single native stream call. A bounded staging
  * buffer provides a valid partial prefix without splitting append/offset state
  * across separate reads or writes. Native libc has no readv/writev symbols yet. */
-static jlong vectorIO(JNIEnv *env, jobject fdo, jlong address, jint count,
+jlong scarlet_vectorIO(JNIEnv *env, jobject fdo, jlong address, jint count,
                       jboolean reading) {
     const size_t limit = 1024 * 1024;
     struct iovec *iov = (struct iovec *)jlong_to_ptr(address);
@@ -98,7 +99,7 @@ static jlong vectorIO(JNIEnv *env, jobject fdo, jlong address, jint count,
     }
     free(buffer);
     errno = saved_errno;
-    return convertLongReturnVal(env, result, reading);
+    return result;
 }
 
 JNIEXPORT jint JNICALL
@@ -125,7 +126,9 @@ JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_readv0(JNIEnv *env, jclass clazz,
                               jobject fdo, jlong address, jint len)
 {
-    return vectorIO(env, fdo, address, len, JNI_TRUE);
+    jlong result = scarlet_vectorIO(env, fdo, address, len, JNI_TRUE);
+    JNU_CHECK_EXCEPTION_RETURN(env, IOS_THROWN);
+    return convertLongReturnVal(env, result, JNI_TRUE);
 }
 
 JNIEXPORT jint JNICALL
@@ -152,7 +155,9 @@ JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_writev0(JNIEnv *env, jclass clazz,
                                        jobject fdo, jlong address, jint len)
 {
-    return vectorIO(env, fdo, address, len, JNI_FALSE);
+    jlong result = scarlet_vectorIO(env, fdo, address, len, JNI_FALSE);
+    JNU_CHECK_EXCEPTION_RETURN(env, IOS_THROWN);
+    return convertLongReturnVal(env, result, JNI_FALSE);
 }
 
 static jlong
@@ -285,9 +290,18 @@ Java_sun_nio_ch_UnixFileDispatcherImpl_lock0(JNIEnv *env, jobject this, jobject 
                                       jboolean block, jlong pos, jlong size,
                                       jboolean shared)
 {
-    // Native whole-file locks do not implement Java's ranged-lock contract.
-    JNU_ThrowByName(env, "java/lang/UnsupportedOperationException",
-                   "File-channel range locks are unavailable on Scarlet");
+    // Do not widen a requested byte range to a native whole-file lock, or
+    // silently turn a blocking request into a nonblocking acquisition.
+    if (pos != 0 || size != INT64_MAX || block) {
+        JNU_ThrowIOException(env, "Scarlet supports nonblocking whole-file locks only");
+        return IOS_THROWN;
+    }
+    int result = flock(fdval(env, fdo), (shared ? LOCK_SH : LOCK_EX) | LOCK_NB);
+    if (result == 0) return sun_nio_ch_UnixFileDispatcherImpl_LOCKED;
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+        return sun_nio_ch_UnixFileDispatcherImpl_NO_LOCK;
+    if (errno == EINTR) return sun_nio_ch_UnixFileDispatcherImpl_INTERRUPTED;
+    JNU_ThrowIOExceptionWithLastError(env, "Whole-file lock failed");
     return IOS_THROWN;
 }
 
@@ -295,9 +309,12 @@ JNIEXPORT void JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_release0(JNIEnv *env, jobject this,
                                          jobject fdo, jlong pos, jlong size)
 {
-    // Native whole-file locks do not implement Java's ranged-lock contract.
-    JNU_ThrowByName(env, "java/lang/UnsupportedOperationException",
-                   "File-channel range locks are unavailable on Scarlet");
+    if (pos != 0 || size != INT64_MAX) {
+        JNU_ThrowIOException(env, "File-channel range locks are unavailable on Scarlet");
+        return;
+    }
+    if (flock(fdval(env, fdo), LOCK_UN) < 0)
+        JNU_ThrowIOExceptionWithLastError(env, "Whole-file unlock failed");
 }
 
 static void closeFileDescriptor(JNIEnv *env, int fd) {

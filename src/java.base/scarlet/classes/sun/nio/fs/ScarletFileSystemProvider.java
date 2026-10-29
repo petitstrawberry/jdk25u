@@ -66,12 +66,10 @@ class ScarletFileSystemProvider extends UnixFileSystemProvider {
     }
 
     private static void checkOpenOptions(Set<? extends OpenOption> options) {
-        // Scarlet's libc has no synchronous-open or direct-I/O flags. Reject
-        // these options before the Unix factory can create/truncate a file.
+        // FileChannel emulates synchronous writes with force. Direct I/O
+        // remains unavailable and must be rejected before opening a file.
         for (OpenOption option : options) {
-            if (option == StandardOpenOption.SYNC ||
-                option == StandardOpenOption.DSYNC ||
-                ExtendedOptions.DIRECT.matches(option)) {
+            if (ExtendedOptions.DIRECT.matches(option)) {
                 throw new UnsupportedOperationException(
                     option + " is not supported on Scarlet");
             }
@@ -99,6 +97,9 @@ class ScarletFileSystemProvider extends UnixFileSystemProvider {
             Path path, Set<? extends OpenOption> options,
             ExecutorService executor, FileAttribute<?>... attrs) throws IOException {
         checkOpenOptions(options);
+        if (options.contains(StandardOpenOption.SYNC) || options.contains(StandardOpenOption.DSYNC)) {
+            throw new UnsupportedOperationException("Synchronous asynchronous channels are unavailable on Scarlet");
+        }
         return super.newAsynchronousFileChannel(path, options, executor, attrs);
     }
 

@@ -80,6 +80,60 @@ JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_IOUtil_writevMax(JNIEnv *env, jclass klass) {
     return INT_MAX;
 }
+JNIEXPORT jlong JNICALL
+Java_sun_nio_ch_IOUtil_makePipe(JNIEnv *env, jobject self, jboolean blocking) {
+    int fd[2];
+    if (pipe2(fd, O_CLOEXEC | (blocking ? 0 : O_NONBLOCK)) < 0) {
+        JNU_ThrowIOExceptionWithLastError(env, "Pipe creation failed");
+        return 0;
+    }
+    return ((jlong)fd[0] << 32) | (jlong)fd[1];
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_ch_IOUtil_write1(JNIEnv *env, jclass cl, jint fd, jbyte b)
+{
+    char c = (char)b;
+    return convertReturnVal(env, write(fd, &c, 1), JNI_FALSE);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_sun_nio_ch_IOUtil_drain(JNIEnv *env, jclass cl, jint fd)
+{
+    char buf[16];
+    int tn = 0;
+
+    for (;;) {
+        int n = read(fd, buf, sizeof(buf));
+        tn += n;
+        if ((n < 0) && (errno != EAGAIN && errno != EWOULDBLOCK))
+            JNU_ThrowIOExceptionWithLastError(env, "Drain");
+        if (n == (int)sizeof(buf))
+            continue;
+        return (tn > 0) ? JNI_TRUE : JNI_FALSE;
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_sun_nio_ch_IOUtil_drain1(JNIEnv *env, jclass cl, jint fd)
+{
+    int res;
+    char buf[1];
+
+    res = read(fd, buf, 1);
+    if (res < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            res = 0;
+        } else if (errno == EINTR) {
+            return IOS_INTERRUPTED;
+        } else {
+            JNU_ThrowIOExceptionWithLastError(env, "read");
+            return IOS_THROWN;
+        }
+    }
+    return res;
+}
+
 /* Declared in nio_util.h for use elsewhere in NIO */
 
 jint

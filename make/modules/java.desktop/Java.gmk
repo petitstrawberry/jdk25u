@@ -46,8 +46,8 @@ EXCLUDE_FILES += \
     .template \
     #
 
-ifeq ($(call isTargetOs, macosx), true)
-  # exclude all X11 on Mac.
+ifeq ($(call isTargetOs, macosx scarlet), true)
+  # These platforms do not use the Unix X11 implementation.
   EXCLUDES += \
       sun/awt/screencast \
       sun/awt/X11 \

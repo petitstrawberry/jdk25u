@@ -584,7 +584,8 @@ void* os::dll_load(const char* path, char* error, int len) {
   const struct { const char* library; const char* entry; } builtins[] = {
     { "libjimage.so", "JIMAGE_Open" }, { "libzip.so", "ZIP_Open" },
     { "libjava.so", "JNI_OnLoad_java" }, { "libverify.so", "VerifyClassCodes" },
-    { "libnio.so", "JNI_OnLoad_nio" }, { "libnet.so", "JNI_OnLoad_net" }
+    { "libnio.so", "JNI_OnLoad_nio" }, { "libnet.so", "JNI_OnLoad_net" },
+    { "libmanagement.so", "JNI_OnLoad_management" }
   };
   for (const auto& builtin : builtins) {
     if (strcmp(name, builtin.library) == 0 && scarlet_jvm_find_builtin(builtin.entry))
