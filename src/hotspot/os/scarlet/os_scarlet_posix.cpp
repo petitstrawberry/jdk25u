@@ -447,11 +447,16 @@ bool os::has_allocatable_memory_limit(size_t* limit) {
 }
 
 void* os::get_default_process_handle() {
-  return (void*)1;
+  static void* handle = ::dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
+  return handle;
 }
 
 void* os::dll_lookup(void* handle, const char* name) {
-  return scarlet_jvm_find_builtin(name);
+  if (handle == get_default_process_handle()) {
+    void* builtin = scarlet_jvm_find_builtin(name);
+    if (builtin != nullptr) return builtin;
+  }
+  return ::dlsym(handle, name);
 }
 
 void os::dll_unload(void *lib) {
@@ -1589,7 +1594,7 @@ const char* os::line_separator() { return "\n"; }
 const char* os::path_separator() { return ":"; }
 
 void* os::lookup_function(const char* name) {
-  return scarlet_jvm_find_builtin(name);
+  return dll_lookup(get_default_process_handle(), name);
 }
 int64_t os::ftell(FILE* file) { return ::ftello(file); }
 int os::fseek(FILE* file, int64_t offset, int whence) {
