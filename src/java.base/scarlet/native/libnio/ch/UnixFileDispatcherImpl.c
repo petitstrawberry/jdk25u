@@ -23,6 +23,8 @@
  * questions.
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -54,6 +56,51 @@
   #define fstatvfs fstatvfs64
 #endif
 
+/* Keep each vector operation a single native stream call. A bounded staging
+ * buffer provides a valid partial prefix without splitting append/offset state
+ * across separate reads or writes. Native libc has no readv/writev symbols yet. */
+static jlong vectorIO(JNIEnv *env, jobject fdo, jlong address, jint count,
+                      jboolean reading) {
+    const size_t limit = 1024 * 1024;
+    struct iovec *iov = (struct iovec *)jlong_to_ptr(address);
+    size_t total = 0;
+    for (jint i = 0; i < count && total < limit; ++i) {
+        size_t length = iov[i].iov_len;
+        if (length > limit - total) length = limit - total;
+        total += length;
+    }
+    if (total == 0) return 0;
+    char *buffer = malloc(total);
+    if (buffer == NULL) {
+        JNU_ThrowOutOfMemoryError(env, "file-channel vector buffer");
+        return IOS_THROWN;
+    }
+    if (!reading) {
+        size_t offset = 0;
+        for (jint i = 0; i < count && offset < total; ++i) {
+            size_t length = iov[i].iov_len;
+            if (length > total - offset) length = total - offset;
+            if (length != 0) memcpy(buffer + offset, iov[i].iov_base, length);
+            offset += length;
+        }
+    }
+    jint fd = fdval(env, fdo);
+    ssize_t result = reading ? read(fd, buffer, total) : write(fd, buffer, total);
+    int saved_errno = errno;
+    if (reading && result > 0) {
+        size_t offset = 0;
+        for (jint i = 0; i < count && offset < (size_t)result; ++i) {
+            size_t length = iov[i].iov_len;
+            if (length > (size_t)result - offset) length = (size_t)result - offset;
+            if (length != 0) memcpy(iov[i].iov_base, buffer + offset, length);
+            offset += length;
+        }
+    }
+    free(buffer);
+    errno = saved_errno;
+    return convertLongReturnVal(env, result, reading);
+}
+
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_read0(JNIEnv *env, jclass clazz,
                              jobject fdo, jlong address, jint len)
@@ -78,9 +125,7 @@ JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_readv0(JNIEnv *env, jclass clazz,
                               jobject fdo, jlong address, jint len)
 {
-    jint fd = fdval(env, fdo);
-    struct iovec *iov = (struct iovec *)jlong_to_ptr(address);
-    return convertLongReturnVal(env, readv(fd, iov, len), JNI_TRUE);
+    return vectorIO(env, fdo, address, len, JNI_TRUE);
 }
 
 JNIEXPORT jint JNICALL
@@ -107,9 +152,7 @@ JNIEXPORT jlong JNICALL
 Java_sun_nio_ch_UnixFileDispatcherImpl_writev0(JNIEnv *env, jclass clazz,
                                        jobject fdo, jlong address, jint len)
 {
-    jint fd = fdval(env, fdo);
-    struct iovec *iov = (struct iovec *)jlong_to_ptr(address);
-    return convertLongReturnVal(env, writev(fd, iov, len), JNI_FALSE);
+    return vectorIO(env, fdo, address, len, JNI_FALSE);
 }
 
 static jlong
