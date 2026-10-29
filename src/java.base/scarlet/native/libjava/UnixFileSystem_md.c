@@ -378,7 +378,7 @@ Java_java_io_UnixFileSystem_createDirectory0(JNIEnv *env, jobject this,
     jboolean rv = JNI_FALSE;
 
     WITH_FIELD_PLATFORM_STRING(env, file, ids.path, path) {
-        if (mkdir(path, 0777) == 0) {
+        if (mkdir(path, 0755) == 0) {
             rv = JNI_TRUE;
         }
     } END_PLATFORM_STRING(env, path);

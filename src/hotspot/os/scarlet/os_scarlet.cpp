@@ -29,6 +29,7 @@
 #include "compiler/disassembler.hpp"
 #include "interpreter/interpreter.hpp"
 #include "jvm.h"
+#include <dlfcn.h>
 #include "jvmtifiles/jvmti.h"
 #include "logging/log.hpp"
 #include "logging/logStream.hpp"
@@ -583,23 +584,32 @@ void* os::dll_load(const char* path, char* error, int len) {
   const struct { const char* library; const char* entry; } builtins[] = {
     { "libjimage.so", "JIMAGE_Open" }, { "libzip.so", "ZIP_Open" },
     { "libjava.so", "JNI_OnLoad_java" }, { "libverify.so", "VerifyClassCodes" },
-    { "libnio.so", "JNI_OnLoad_nio" }, { "libnet.so", "JNI_OnLoad_net" }
+    { "libnio.so", "JNI_OnLoad_nio" }, { "libnet.so", "JNI_OnLoad_net" },
+    { "libmanagement.so", "JNI_OnLoad_management" }
   };
   for (const auto& builtin : builtins) {
     if (strcmp(name, builtin.library) == 0 && scarlet_jvm_find_builtin(builtin.entry))
       return get_default_process_handle();
   }
-  jio_snprintf(error, len, "Library is not statically linked into Scarlet Java: %s", name);
-  return nullptr;
+  void* handle = ::dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+  if (handle == nullptr) {
+    const char* reason = ::dlerror();
+    jio_snprintf(error, len, "%s", reason != nullptr ? reason : "Cannot load JNI library");
+  }
+  return handle;
 }
-bool os::pd_dll_unload(void*, char* error, int len) {
-  jio_snprintf(error, len, "Static JNI libraries cannot be unloaded"); return false;
+bool os::pd_dll_unload(void* handle, char* error, int len) {
+  if (handle == get_default_process_handle()) return true;
+  if (::dlclose(handle) == 0) return true;
+  const char* reason = ::dlerror();
+  jio_snprintf(error, len, "%s", reason != nullptr ? reason : "Cannot close JNI library");
+  return false;
 }
 bool os::address_is_in_vm(address) { return false; }
 void os::prepare_native_symbols() {}
 bool os::dll_address_to_function_name(address, char*, int, int*, bool) { return false; }
 bool os::dll_address_to_library_name(address, char*, int, int*) { return false; }
-void os::print_dll_info(outputStream* st) { st->print_cr("Statically linked OpenJDK on Scarlet"); }
+void os::print_dll_info(outputStream* st) { st->print_cr("OpenJDK on Scarlet with scarlet-ld JNI loading"); }
 int os::get_loaded_modules_info(LoadedModulesCallbackFunc, void*) { return -1; }
 bool os::find(address, outputStream*) { return false; }
 void os::get_summary_os_info(char* buf, size_t len) { jio_snprintf(buf, len, "Scarlet"); }

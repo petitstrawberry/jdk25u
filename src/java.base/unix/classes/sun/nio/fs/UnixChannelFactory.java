@@ -72,8 +72,8 @@ class UnixChannelFactory {
             for (OpenOption option: options) {
                 // Reject unsupported modes before creating/truncating a file,
                 // including opens relative to a SecureDirectoryStream.
-                if ((option == StandardOpenOption.SYNC && O_SYNC == -1) ||
-                    (option == StandardOpenOption.DSYNC && O_DSYNC == -1) ||
+                if ((!OperatingSystem.isScarlet() && option == StandardOpenOption.SYNC && O_SYNC == -1) ||
+                    (!OperatingSystem.isScarlet() && option == StandardOpenOption.DSYNC && O_DSYNC == -1) ||
                     (OperatingSystem.isScarlet() && ExtendedOptions.DIRECT.matches(option))) {
                     throw new UnsupportedOperationException(option + " not supported");
                 }
@@ -235,9 +235,9 @@ class UnixChannelFactory {
             oflags |= O_NOFOLLOW;
         }
 
-        if (flags.dsync)
+        if (flags.dsync && !OperatingSystem.isScarlet())
             oflags |= O_DSYNC;
-        if (flags.sync)
+        if (flags.sync && !OperatingSystem.isScarlet())
             oflags |= O_SYNC;
         if (flags.direct)
             oflags |= O_DIRECT;

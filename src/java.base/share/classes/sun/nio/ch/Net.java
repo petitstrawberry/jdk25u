@@ -507,7 +507,7 @@ public class Net {
     static FileDescriptor serverSocket(ProtocolFamily family) {
         boolean preferIPv6 = isIPv6Available() &&
             (family != StandardProtocolFamily.INET);
-        return IOUtil.newFD(socket0(preferIPv6, true, true, FAST_LOOPBACK));
+        return IOUtil.newFD(socket0(preferIPv6, true, !OperatingSystem.isScarlet(), FAST_LOOPBACK));
     }
 
     // Due to oddities SO_REUSEADDR on Windows reuse is ignored

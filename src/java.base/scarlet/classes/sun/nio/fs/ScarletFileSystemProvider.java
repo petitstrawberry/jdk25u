@@ -35,6 +35,7 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
@@ -51,13 +52,24 @@ class ScarletFileSystemProvider extends UnixFileSystemProvider {
         return new ScarletFileSystem(this, dir);
     }
 
+    @Override
+    public void createDirectory(Path path, FileAttribute<?>... attrs) throws IOException {
+        // Native Scarlet currently creates directories with mode 0755 and has
+        // no process umask. Select the platform default before entering the
+        // shared Unix implementation; explicit attributes retain their checks.
+        if (attrs.length == 0) {
+            super.createDirectory(path, PosixFilePermissions.asFileAttribute(
+                    PosixFilePermissions.fromString("rwxr-xr-x")));
+        } else {
+            super.createDirectory(path, attrs);
+        }
+    }
+
     private static void checkOpenOptions(Set<? extends OpenOption> options) {
-        // Scarlet's libc has no synchronous-open or direct-I/O flags. Reject
-        // these options before the Unix factory can create/truncate a file.
+        // FileChannel emulates synchronous writes with force. Direct I/O
+        // remains unavailable and must be rejected before opening a file.
         for (OpenOption option : options) {
-            if (option == StandardOpenOption.SYNC ||
-                option == StandardOpenOption.DSYNC ||
-                ExtendedOptions.DIRECT.matches(option)) {
+            if (ExtendedOptions.DIRECT.matches(option)) {
                 throw new UnsupportedOperationException(
                     option + " is not supported on Scarlet");
             }
@@ -85,6 +97,9 @@ class ScarletFileSystemProvider extends UnixFileSystemProvider {
             Path path, Set<? extends OpenOption> options,
             ExecutorService executor, FileAttribute<?>... attrs) throws IOException {
         checkOpenOptions(options);
+        if (options.contains(StandardOpenOption.SYNC) || options.contains(StandardOpenOption.DSYNC)) {
+            throw new UnsupportedOperationException("Synchronous asynchronous channels are unavailable on Scarlet");
+        }
         return super.newAsynchronousFileChannel(path, options, executor, attrs);
     }
 

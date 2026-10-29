@@ -24,6 +24,7 @@
  */
 
 #include <errno.h>
+#include <dlfcn.h>
 #include <string.h>
 
 #include "jvm.h"
@@ -37,12 +38,13 @@ extern int __xpg_strerror_r(int, char *, size_t);
 #define strerror_r(a, b, c) __xpg_strerror_r((a), (b), (c))
 #endif
 
-/* Static native libraries are resolved by HotSpot's scarlet_jvm_find_builtin
- * registry. This opaque token identifies that namespace; it is never passed
- * to the dynamic loader. */
+/* Use the resident loader's process namespace for built-in JNI libraries. */
 void* getProcessHandle() {
-    static const char builtin_namespace = 0;
-    return (void*)&builtin_namespace;
+    static void *handle = NULL;
+    if (handle == NULL) {
+        handle = dlopen(NULL, RTLD_NOW | RTLD_GLOBAL);
+    }
+    return handle;
 }
 
 void buildJniFunctionName(const char *sym, const char *cname,
