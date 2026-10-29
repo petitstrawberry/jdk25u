@@ -54,6 +54,7 @@ import jdk.internal.event.FileForceEvent;
 import jdk.internal.foreign.MemorySessionImpl;
 import jdk.internal.foreign.SegmentFactories;
 import jdk.internal.misc.Blocker;
+import jdk.internal.util.OperatingSystem;
 import jdk.internal.misc.ExtendedMapMode;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -162,6 +163,15 @@ public class FileChannelImpl
                                    boolean sync, boolean direct, Closeable parent)
     {
         return new FileChannelImpl(fd, path, readable, writable, sync, direct, parent);
+    }
+
+    // Native Scarlet has fsync but no synchronous-open flags. Preserve the
+    // channel's existing sync state and lifecycle while flushing successful
+    // mutations before returning. A metadata flush also satisfies DSYNC.
+    private void synchronizeWrittenBytes(long written) throws IOException {
+        if (written > 0 && sync && OperatingSystem.isScarlet()) {
+            implForce(true);
+        }
     }
 
     private void ensureOpen() throws IOException {
@@ -353,6 +363,7 @@ public class FileChannelImpl
                     boolean attempted = Blocker.begin(sync || direct);
                     try {
                         n = IOUtil.write(fd, src, -1, direct, alignment, nd);
+                        synchronizeWrittenBytes(n);
                     } finally {
                         Blocker.end(attempted);
                     }
@@ -405,6 +416,7 @@ public class FileChannelImpl
                     boolean attempted = Blocker.begin(sync || direct);
                     try {
                         n = IOUtil.write(fd, srcs, offset, length, direct, alignment, nd);
+                        synchronizeWrittenBytes(n);
                     } finally {
                         Blocker.end(attempted);
                     }
@@ -585,6 +597,7 @@ public class FileChannelImpl
                 if (newSize < size) {
                     do {
                         rv = nd.truncate(fd, newSize);
+                        if (rv >= 0) synchronizeWrittenBytes(1);
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
@@ -1259,6 +1272,7 @@ public class FileChannelImpl
                 boolean attempted = Blocker.begin(sync || direct);
                 try {
                     n = IOUtil.write(fd, src, position, direct, alignment, nd);
+                    synchronizeWrittenBytes(n);
                 } finally {
                     Blocker.end(attempted);
                 }
@@ -1498,6 +1512,7 @@ public class FileChannelImpl
                     int rv;
                     do {
                         rv = nd.truncate(fd, position + size);
+                        if (rv >= 0) synchronizeWrittenBytes(1);
                     } while ((rv == IOStatus.INTERRUPTED) && isOpen());
                     if (!isOpen())
                         return null;
